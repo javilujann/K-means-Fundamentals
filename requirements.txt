@@ -1,0 +1,8 @@
+# Runtime dependencies for the Lab 1 k-means scripts.
+#   python -m pip install -r requirements.txt
+#
+# Mirrors the "run" dependency group in pyproject.toml; install the "dev"
+# group instead (python -m pip install --group dev) for linting and typing.
+matplotlib>=3.10
+numpy>=2.3
+pandas>=2.3
