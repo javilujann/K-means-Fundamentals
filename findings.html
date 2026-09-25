@@ -1,0 +1,709 @@
+<title>Protein K-Means Benchmarks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #eceff4;
+    --surface: #ffffff;
+    --surface-2: #f4f6f9;
+    --ink: #0f1319;
+    --ink-2: #4c5764;
+    --ink-3: #6f7986;
+    --line: #d8dde5;
+    --line-strong: #b9c1cd;
+    --mp: #2a78d6;
+    --th: #eb6834;
+    --ref: #1baf7a;
+    --plate: #fcfcfb;
+    --shadow: 0 1px 2px rgba(15, 19, 25, .06), 0 8px 24px -16px rgba(15, 19, 25, .28);
+
+    --step--1: 0.8125rem;
+    --step-0: 1rem;
+    --step-1: 1.1875rem;
+    --step-2: 1.5rem;
+    --step-3: 2rem;
+    --step-4: 2.75rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0e1116;
+      --surface: #161a21;
+      --surface-2: #1c212a;
+      --ink: #f0f3f7;
+      --ink-2: #a7b1be;
+      --ink-3: #828d9b;
+      --line: #272d37;
+      --line-strong: #39414e;
+      --mp: #3987e5;
+      --th: #f07a4d;
+      --ref: #23c087;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -18px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0e1116;
+    --surface: #161a21;
+    --surface-2: #1c212a;
+    --ink: #f0f3f7;
+    --ink-2: #a7b1be;
+    --ink-3: #828d9b;
+    --line: #272d37;
+    --line-strong: #39414e;
+    --mp: #3987e5;
+    --th: #f07a4d;
+    --ref: #23c087;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -18px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    font-size: var(--step-0);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 2.5rem) 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  h1, h2, h3, .eyebrow, .label, th, .tile, nav, .meta, figcaption, .note-title {
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  }
+
+  code, .mono, td.num, th.num, .formula, .console {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- masthead ---------- */
+  header { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  .eyebrow {
+    font-size: var(--step--1);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--step-4);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -.022em;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: 44rem;
+    font-size: var(--step-1);
+    color: var(--ink-2);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: var(--step--1);
+    color: var(--ink-3);
+  }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- headline tiles ---------- */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1rem;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem 1.25rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .tile::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--chip, var(--line-strong));
+  }
+  .tile .label {
+    font-size: var(--step--1);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .tile .value {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--step-3);
+    line-height: 1;
+    letter-spacing: -.02em;
+  }
+  .tile .sub { font-size: var(--step--1); color: var(--ink-2); }
+  .tile.mp { --chip: var(--mp); }
+  .tile.th { --chip: var(--th); }
+  .tile.ref { --chip: var(--line-strong); }
+
+  /* ---------- nav ---------- */
+  nav ol {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem .5rem;
+    margin: 0;
+    padding: 0;
+    font-size: var(--step--1);
+  }
+  nav a {
+    display: inline-block;
+    padding: .3rem .7rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-2);
+    text-decoration: none;
+    background: var(--surface);
+  }
+  nav a:hover { border-color: var(--mp); color: var(--mp); }
+  nav a:focus-visible { outline: 2px solid var(--mp); outline-offset: 2px; }
+
+  /* ---------- sections ---------- */
+  section { display: flex; flex-direction: column; gap: 1.1rem; scroll-margin-top: 1.5rem; }
+
+  h2 {
+    margin: 0;
+    font-size: var(--step-2);
+    font-weight: 600;
+    letter-spacing: -.015em;
+    line-height: 1.2;
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+  }
+  h2 .num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: var(--step--1);
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
+  h3 {
+    margin: .6rem 0 -.3rem;
+    font-size: var(--step-1);
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+
+  p { margin: 0; max-width: 42rem; }
+  p + p { margin-top: -.2rem; }
+  section > p:first-of-type { margin-top: -.2rem; }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .mp-word { color: var(--mp); font-weight: 600; font-style: normal; }
+  .th-word { color: var(--th); font-weight: 600; font-style: normal; }
+
+  ul { margin: 0; padding-left: 1.1rem; max-width: 42rem; display: flex; flex-direction: column; gap: .5rem; }
+  li::marker { color: var(--ink-3); }
+
+  code {
+    font-size: .9em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .05em .35em;
+  }
+
+  /* ---------- tables ---------- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--step--1);
+  }
+
+  th, td { padding: .6rem .9rem; text-align: left; }
+
+  th {
+    font-size: .75rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+
+  td {
+    border-bottom: 1px solid var(--line);
+    font-family: "IBM Plex Sans", sans-serif;
+    color: var(--ink-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface-2); }
+
+  td.num, th.num { text-align: right; }
+  td.num { color: var(--ink); }
+  td.name { color: var(--ink); font-weight: 500; }
+
+  tr.pick td { background: color-mix(in srgb, var(--mp) 8%, transparent); }
+  tr.pick td.name { position: relative; }
+  tr.pick td.name::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--mp);
+  }
+  .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .7rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--mp);
+    margin-left: .5rem;
+  }
+  .chip {
+    display: inline-block;
+    width: .55rem; height: .55rem;
+    border-radius: 2px;
+    margin-right: .5rem;
+    vertical-align: baseline;
+  }
+  .chip.mp { background: var(--mp); }
+  .chip.th { background: var(--th); }
+  .chip.ref { background: var(--ref); }
+
+  caption {
+    caption-side: bottom;
+    padding: .7rem .9rem;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: var(--step--1);
+    color: var(--ink-3);
+    text-align: left;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------- figures ---------- */
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+  }
+  figure .plate {
+    background: var(--plate);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: .75rem;
+    box-shadow: var(--shadow);
+  }
+  figure img { display: block; width: 100%; height: auto; border-radius: 4px; }
+  figcaption { font-size: var(--step--1); color: var(--ink-3); max-width: 42rem; }
+  figcaption b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- formula + console ---------- */
+  .formula, .console {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--mp);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    font-size: var(--step--1);
+    line-height: 1.75;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .console { border-left-color: var(--line-strong); color: var(--ink-2); }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    box-shadow: var(--shadow);
+  }
+  .note-title {
+    font-size: var(--step--1);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .callout p { max-width: none; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: var(--step--1);
+    color: var(--ink-3);
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nav a, tbody tr { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Lab 1 &middot; Technological Fundamentals in the Big Data World</div>
+    <h1>What the parallel k-means versions actually bought</h1>
+    <p class="standfirst">Measurements, scaling curves and the Amdahl analysis for the serial,
+      multiprocessing and threaded programs — the source material for the part-four report.</p>
+    <div class="meta">
+      <span><b>Dataset</b> proteins.csv, 2,000,000 rows, seed 42</span>
+      <span><b>Machine</b> Core i5-13500H, 12 cores / 16 logical</span>
+      <span><b>Stack</b> Python 3.14.7, NumPy 2.5.3, pandas 3.0.6</span>
+      <span><b>Method</b> median of 3 interleaved runs, idle machine</span>
+    </div>
+  </header>
+
+  <div class="tiles">
+    <div class="tile ref">
+      <span class="label">Serial</span>
+      <span class="value">37.35 s</span>
+      <span class="sub">baseline, 1.00&times;</span>
+    </div>
+    <div class="tile mp">
+      <span class="label">Multiprocessing</span>
+      <span class="value">7.37 s</span>
+      <span class="sub">5.07&times; faster &middot; 32% of 16 workers</span>
+    </div>
+    <div class="tile th">
+      <span class="label">Threads</span>
+      <span class="value">9.84 s</span>
+      <span class="sub">3.80&times; faster &middot; 24% of 16 workers</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="note-title">How these numbers were taken</span>
+    <p>Nothing else ran on the machine. The headline is the median of three interleaved runs after a
+      discarded warm-up, and every sweep carries its own serial reference measured inside the same
+      block — because under sustained load the CPU settles into a lower clock, and the same program
+      takes 35.05 s cold against 37.35 s in steady state. Speedups survive that drift (5.19&times;
+      cold, 5.07&times; warm); absolute times may only be compared within a block. An earlier set,
+      taken while other copies of the programs were running, was discarded entirely.</p>
+  </div>
+
+  <nav aria-label="Sections">
+    <ol>
+      <li><a href="#split">How the work was split</a></li>
+      <li><a href="#time">Where the time goes</a></li>
+      <li><a href="#scaling">Scaling</a></li>
+      <li><a href="#chunks">The tuning that paid</a></li>
+      <li><a href="#amdahl">Amdahl &amp; Karp–Flatt</a></li>
+      <li><a href="#threads">Why threads lose</a></li>
+      <li><a href="#small">When it does not pay</a></li>
+      <li><a href="#correct">Correctness</a></li>
+    </ol>
+  </nav>
+
+  <section id="split">
+    <h2><span class="num">01</span> How the work was split</h2>
+    <p>Both parallel versions apply the same <strong>data parallelism (SPMD)</strong> to the inner
+      loop of k-means, which is where all the time goes. The dataset is divided once; every worker
+      then runs the identical step on its own slice and returns three small numbers per cluster.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">Decomposition</td><td>One k-means iteration over one chunk of the dataset is a task</td></tr>
+          <tr><td class="name">Assignment</td><td>Each worker assigns its points to the closest centroid, then reduces them to points per cluster, feature sums per cluster and chunk inertia</td></tr>
+          <tr><td class="name">Orchestration</td><td>Only the centroids travel out (k&nbsp;&times;&nbsp;2 floats), only the partial sums come back (k&nbsp;&times;&nbsp;3 values); the master adds them up and moves the centroids — one map-reduce round per iteration</td></tr>
+          <tr><td class="name">Mapping</td><td>One worker per logical core; the operating system places them</td></tr>
+        </tbody>
+        <caption>The four steps of the parallelization process, as applied to Lab 1.</caption>
+      </table>
+    </div>
+
+    <p>The mechanism is the only difference between the two programs.
+      <span class="mp-word">lab1-proteins-mp.py</span> creates one <code>mp.Pool(mp.cpu_count())</code>
+      whose <code>initializer</code> hands each process the dataset a single time, then calls
+      <code>pool.starmap</code> per iteration. Separate address spaces, no GIL.
+      <span class="th-word">lab1-proteins-th.py</span> starts and joins <code>os.cpu_count()</code>
+      threads on every iteration; they share memory, so each receives its chunk as a NumPy view with
+      no copy and appends its partial result to one shared list behind a <code>Lock</code>. That
+      version gains anything at all only because NumPy releases the GIL while it computes.</p>
+  </section>
+
+  <section id="time">
+    <h2><span class="num">02</span> Where the time goes</h2>
+
+    <figure>
+      <div class="plate"><img src="figures/fig2-phases.png" alt="Stacked bars comparing execution phases: the serial version spends 35.2 s in the elbow, multiprocessing 4.8 s, threads 7.8 s, while the ~1.9 s CSV read is identical in all three."></div>
+      <figcaption><b>Figure 2.</b> The CSV read is the same ~1.9 s in every version. What shrinks is the elbow — the ten k-means runs that build the curve.</figcaption>
+    </figure>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th class="num">Serial</th>
+            <th class="num">Multiprocessing</th>
+            <th class="num">Threads</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">CSV read (never parallel)</td><td class="num">1.97 s</td><td class="num">1.94 s</td><td class="num">1.91 s</td></tr>
+          <tr><td class="name">Worker startup</td><td class="num">—</td><td class="num">0.62 s</td><td class="num">~0 s</td></tr>
+          <tr><td class="name">Elbow, k = 1…10</td><td class="num">35.17 s</td><td class="num">4.75 s</td><td class="num">7.79 s</td></tr>
+          <tr><td class="name">Final k-means + report</td><td class="num">0.74 s</td><td class="num">0.20 s</td><td class="num">0.29 s</td></tr>
+          <tr class="pick"><td class="name">Total</td><td class="num">37.89 s</td><td class="num">7.52 s</td><td class="num">9.99 s</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Taken on its own, the parallelized section speeds up <strong>7.4&times;</strong> with processes
+      and <strong>4.5&times;</strong> with threads. The whole-program figures are lower because the
+      serial read and the pool startup are charged against the total — which is exactly what
+      Amdahl's law describes.</p>
+  </section>
+
+  <section id="scaling">
+    <h2><span class="num">03</span> Scaling</h2>
+
+    <figure>
+      <div class="plate"><img src="figures/fig1-speedup.png" alt="Speedup curves against worker count: multiprocessing reaches 4.8x at 16 workers, threads 3.7x, the Amdahl bound 8.9x, against linear scaling."></div>
+      <figcaption><b>Figure 1.</b> Both curves bend away from linear early and flatten past twelve workers.</figcaption>
+    </figure>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Workers</th>
+            <th class="num"><span class="chip mp"></span>Multiprocessing</th>
+            <th class="num">Speedup</th>
+            <th class="num"><span class="chip th"></span>Threads</th>
+            <th class="num">Speedup</th>
+            <th class="num"><span class="chip ref"></span>Amdahl bound</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">1</td><td class="num">36.83 s</td><td class="num">0.96&times;</td><td class="num">36.55 s</td><td class="num">1.03&times;</td><td class="num">1.00&times;</td></tr>
+          <tr><td class="name">2</td><td class="num">21.10 s</td><td class="num">1.68&times;</td><td class="num">21.72 s</td><td class="num">1.73&times;</td><td class="num">1.90&times;</td></tr>
+          <tr><td class="name">4</td><td class="num">12.73 s</td><td class="num">2.78&times;</td><td class="num">14.43 s</td><td class="num">2.60&times;</td><td class="num">3.45&times;</td></tr>
+          <tr><td class="name">8</td><td class="num">9.00 s</td><td class="num">3.93&times;</td><td class="num">11.34 s</td><td class="num">3.31&times;</td><td class="num">5.82&times;</td></tr>
+          <tr><td class="name">12</td><td class="num">7.73 s</td><td class="num">4.58&times;</td><td class="num">10.25 s</td><td class="num">3.66&times;</td><td class="num">7.56&times;</td></tr>
+          <tr class="pick"><td class="name">16 <span class="tag">shipped</span></td><td class="num">7.39 s</td><td class="num">4.79&times;</td><td class="num">10.16 s</td><td class="num">3.69&times;</td><td class="num">8.88&times;</td></tr>
+        </tbody>
+        <caption>Two runs per point. Each version is measured against a serial reference taken inside its own block — 35.41 s for the processes, 37.50 s for the threads.</caption>
+      </table>
+    </div>
+
+    <p>With a single worker both versions land on the serial time to within the measurement noise —
+      0.96&times; and 1.03&times;. One worker doing every chunk <em>is</em> the serial program plus
+      the machinery around it, and that machinery is cheap enough to vanish into the &plusmn;4%
+      spread between runs.</p>
+    <p>Past twelve workers the curves flatten. The last logical cores are SMT siblings and
+      efficiency cores, and the k-means steps move far more data than they compute, so memory
+      bandwidth runs out before arithmetic does. Threads beyond one per core only get worse:
+      24 threads 11.07 s, 32 threads 10.38 s, 48 threads 11.89 s, 64 threads 13.75 s.</p>
+  </section>
+
+  <section id="chunks">
+    <h2><span class="num">04</span> The one tuning that paid</h2>
+
+    <p>Giving each process <em>several</em> chunks instead of exactly one is worth 16% of the total
+      runtime — the single largest optimization found.</p>
+
+    <figure>
+      <div class="plate"><img src="figures/fig3-chunks.png" alt="Bar chart of execution time against chunks per process: 9.21 s with one chunk each, 7.98 s with four, rising slowly to 8.16 s with twelve."></div>
+      <figcaption><b>Figure 3.</b> The optimum is flat between two and eight chunks per process; four was chosen as the middle of that range rather than a machine-specific peak.</figcaption>
+    </figure>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Chunks per process</th><th class="num">Time</th><th class="num">Speedup</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">1</td><td class="num">9.21 s</td><td class="num">4.02&times;</td></tr>
+          <tr><td class="name">2</td><td class="num">8.21 s</td><td class="num">4.52&times;</td></tr>
+          <tr class="pick"><td class="name">4 <span class="tag">chosen</span></td><td class="num">7.98 s</td><td class="num">4.64&times;</td></tr>
+          <tr><td class="name">6</td><td class="num">7.91 s</td><td class="num">4.69&times;</td></tr>
+          <tr><td class="name">8</td><td class="num">8.07 s</td><td class="num">4.59&times;</td></tr>
+          <tr><td class="name">12</td><td class="num">8.16 s</td><td class="num">4.54&times;</td></tr>
+        </tbody>
+        <caption>16 processes throughout; two runs per point, against a 37.06 s serial reference from the same block.</caption>
+      </table>
+    </div>
+
+    <p>The cause is the processor. An i5-13500H has four performance cores and eight efficiency
+      cores, so equally sized chunks do <em>not</em> take equal time. With one chunk per process,
+      every iteration ends only when the slowest efficiency core finishes and the fast cores idle at
+      the barrier. Cutting the data finer lets the pool hand spare chunks to whichever worker is
+      free, and the fast cores simply do more of them.</p>
+
+    <div class="callout">
+      <span class="note-title">Why the threaded version cannot copy this</span>
+      <p>There, a chunk <em>is</em> a thread. Extra chunks mean extra threads created and joined on
+        every iteration, which is what the 24-to-64 thread measurements show: the balancing gain and
+        the creation cost cancel out.</p>
+    </div>
+  </section>
+
+  <section id="amdahl">
+    <h2><span class="num">05</span> Amdahl's law, and what it does not explain</h2>
+
+    <p>The serial fraction is the part no number of workers can shrink: the 1.94 s CSV read plus the
+      ~0.08 s final label pass, against a 37.89 s total.</p>
+
+    <div class="formula">s = 2.02 / 37.89 = 0.053        (5.3% serial, 94.7% parallel)
+
+S(N)   = 1 / (s + p/N)
+S(16)  = 1 / (0.053 + 0.947/16) =  8.88x
+S(inf) = 1 / 0.053              = 18.7x</div>
+
+    <p>Measured against that bound, multiprocessing reaches <strong>5.07&times;, or 57% of the
+      8.88&times; ceiling</strong>; threads reach 3.80&times;, 43% of it. The gap is not serial code.
+      It is parallel overhead, load imbalance across unequal cores, and memory bandwidth.</p>
+
+    <p>The Karp–Flatt metric separates those out, deriving the <em>effective</em> serial fraction
+      from each measured speedup: <code>e = (1/S − 1/N) / (1 − 1/N)</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Workers</th><th class="num"><span class="chip mp"></span>Multiprocessing e</th><th class="num"><span class="chip th"></span>Threads e</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">2</td><td class="num">19.2%</td><td class="num">15.8%</td></tr>
+          <tr><td class="name">4</td><td class="num">14.6%</td><td class="num">18.0%</td></tr>
+          <tr><td class="name">8</td><td class="num">14.8%</td><td class="num">20.3%</td></tr>
+          <tr><td class="name">12</td><td class="num">14.7%</td><td class="num">20.7%</td></tr>
+          <tr><td class="name">16</td><td class="num">15.6%</td><td class="num">22.2%</td></tr>
+        </tbody>
+        <caption>Effective serial fraction implied by each measured speedup, against 5.3% of genuinely serial code.</caption>
+      </table>
+    </div>
+
+    <p>For multiprocessing <code>e</code> settles near 15% against 5.3% of real serial code: about
+      ten points of loss are overhead, and because <code>e</code> stays flat as workers are added,
+      that overhead is proportional rather than growing — the per-iteration dispatch and barrier, not
+      a bottleneck that worsens with scale. For threads <code>e</code> climbs steadily from 15.8% to
+      22.2%, which is the GIL: the parts of each iteration that run Python instead of NumPy cannot
+      overlap, and their relative weight grows as the parallel part shrinks.</p>
+
+    <p>Gustafson's law gives the optimistic reading for a growing problem: at the same 5.5% serial
+      fraction, a dataset scaled to 16 workers would show a scaled speedup of
+      <code>s + p·N = 15.2&times;</code>. The lab's dataset is fixed, so Amdahl is the bound that
+      applies — but the elbow-only figure of 7.4&times; shows what the implementation reaches once
+      the serial read is out of the picture.</p>
+  </section>
+
+  <section id="threads">
+    <h2><span class="num">06</span> Why threads lose to processes</h2>
+    <ul>
+      <li><strong>The GIL.</strong> NumPy releases it inside its kernels, which is the whole reason
+        threads gain anything; the Python around them — the loop over chunks, the reduction, the
+        convergence test — holds it, and that fraction cannot overlap.</li>
+      <li><strong>Thread lifetime.</strong> Threads are created and joined on each of roughly 350
+        iterations, while the process pool is created once and reused.</li>
+      <li><strong>No load balancing.</strong> Processes can be given more chunks than workers;
+        threads cannot, so every iteration waits for the slowest core.</li>
+    </ul>
+    <p>Threads do have one real advantage: no data ever moves. The chunks are NumPy views, nothing
+      is pickled, and there is no 0.62 s pool startup. It is not enough to cover the three costs
+      above.</p>
+  </section>
+
+  <section id="small">
+    <h2><span class="num">07</span> When parallelism does not pay</h2>
+    <p>On the 50,000-protein development dataset, both parallel versions are <em>slower</em> than the
+      serial one.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Version</th><th class="num">50,000 rows</th><th class="num">Speedup</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">Serial</td><td class="num">0.82 s</td><td class="num">1.00&times;</td></tr>
+          <tr><td class="name">Multiprocessing</td><td class="num">1.39 s</td><td class="num">0.59&times;</td></tr>
+          <tr><td class="name">Threads</td><td class="num">1.29 s</td><td class="num">0.64&times;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The work per iteration is too small to cover process creation, dispatch and synchronization —
+      the textbook case of overhead dominating a fine-grained workload. Parallelism pays here only
+      at the two-million-row scale the lab asks for.</p>
+  </section>
+
+  <section id="correct">
+    <h2><span class="num">08</span> Correctness</h2>
+    <p>All three programs print identical results on both datasets, which is what makes the timings
+      comparable at all.</p>
+
+    <div class="console">Proteins read: 2000000
+Optimum number of clusters (k): 3
+Cluster with the highest sequence length:
+  id: 1
+  highest sequence length: 263
+  average sequence length: 125.92
+  centroid: enzyme=8.50, hydrofob=185.23</div>
+
+    <p>They share the seed, the initial centroids and the arithmetic. The parallel versions only
+      change the order in which partial sums are added, which does not move a centroid at this
+      precision.</p>
+  </section>
+
+  <footer>
+    <span>The same content in copy-paste form lives in <code>findings.md</code>; the figures are in
+      <code>figures/</code> at 160 dpi, ready to embed.</span>
+    <span>Measurements taken 25 September 2026 on an idle machine, on the programs as delivered, with
+      seed 42 throughout. An earlier set, taken while other work shared the CPU, was discarded.</span>
+  </footer>
+
+</div>
