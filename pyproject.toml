@@ -105,6 +105,8 @@ ignore = [
 "lab1-proteins-serial.py" = ["N999", "T201"]
 "lab1-proteins-mp.py" = ["N999", "T201"]
 "lab1-proteins-th.py" = ["N999", "T201"]
+"lab1-proteins-mp-ep.py" = ["N999", "T201"]
+"lab1-proteins-th-ep.py" = ["N999", "T201"]
 # Test-suite carve-outs. Kept here in every template so that adding a `tests/`
 # directory later never requires touching the lint configuration.
 "tests/**/*.py" = [
@@ -131,6 +133,8 @@ include = [
     "lab1-proteins-serial.py",
     "lab1-proteins-mp.py",
     "lab1-proteins-th.py",
+    "lab1-proteins-mp-ep.py",
+    "lab1-proteins-th-ep.py",
 ]
 pythonVersion = "3.14"
 pythonPlatform = "All"

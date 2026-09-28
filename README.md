@@ -2,18 +2,20 @@
 
 Master in Big Data — *Technological Fundamentals in the Big Data World*.
 
-Parts one to three are implemented: the serial program and its two parallel
-versions, with multiprocessing and with threads. Part four, the written
-report, is not part of this repository.
+Parts one to three are implemented: the serial program and, for each of the
+two parallel parts, two programs that solve it under a different parallel
+paradigm. Part four, the written report, is not part of this repository.
 
-| Part | Program                   | Parallelism                    |
-| ---- | ------------------------- | ------------------------------ |
-| 1    | `lab1-proteins-serial.py` | none                           |
-| 2    | `lab1-proteins-mp.py`     | `multiprocessing`, `Pool`      |
-| 3    | `lab1-proteins-th.py`     | `threading`, `Thread`          |
+| Part | Program                   | Tool              | Paradigm                               |
+| ---- | ------------------------- | ----------------- | -------------------------------------- |
+| 1    | `lab1-proteins-serial.py` | —                 | none                                   |
+| 2    | `lab1-proteins-mp.py`     | `multiprocessing` | data parallel (SPMD)                   |
+| 2    | `lab1-proteins-mp-ep.py`  | `multiprocessing` | task farming (embarrassingly parallel) |
+| 3    | `lab1-proteins-th.py`     | `threading`       | data parallel (SPMD)                   |
+| 3    | `lab1-proteins-th-ep.py`  | `threading`       | task farming (embarrassingly parallel) |
 
-The three programs print exactly the same results — same seed, same initial
-centroids, same arithmetic — and differ only in how the work is spread.
+Every program prints exactly the same results — same seed, same initial
+centroids, same arithmetic — and they differ only in how the work is spread.
 
 ## Dataset
 
@@ -35,13 +37,17 @@ python -m venv .venv
 source .venv/bin/activate        # fish: source .venv/bin/activate.fish
 python -m pip install --group dev
 python lab1-proteins-serial.py    # part one
-python lab1-proteins-mp.py        # part two
-python lab1-proteins-th.py        # part three
+python lab1-proteins-mp.py        # part two,   data parallel
+python lab1-proteins-mp-ep.py     # part two,   task farming
+python lab1-proteins-th.py        # part three, data parallel
+python lab1-proteins-th-ep.py     # part three, task farming
 ```
 
-LAB1.pdf spells the threaded program `lab1-Proteins-th.py`, with a capital
-`P`. The file here is all lowercase: rename it before zipping the delivery if
-the exact spelling is graded.
+LAB1.pdf accepts exactly three programs in the delivery, named
+`lab1-proteins-serial.py`, `lab1-proteins-mp.py` and `lab1-Proteins-th.py`
+(with a capital `P` for the threaded one, and all lowercase here). The `-ep`
+pair is kept in the repository for the comparison the report needs: zip
+whichever pair of parallel programs is delivered under those two names.
 
 The lab forbids absolute or relative paths to the dataset, so the program
 reads `proteins.csv` from the working directory: run it from the directory
@@ -72,6 +78,8 @@ random generator is always seeded with `SEED = 42`, so runs are reproducible.
 
 ## How the parallel versions work
 
+### Data parallel — `lab1-proteins-mp.py`, `lab1-proteins-th.py`
+
 Both follow the same data-parallel (SPMD) decomposition, applied to the inner
 loop of k-means, which is where all the time goes:
 
@@ -91,26 +99,65 @@ receives its chunk as a NumPy view with no copy, and they collect their
 partial results in a shared list protected by a lock. NumPy releases the GIL
 while it works, which is what makes the threaded version gain anything at all.
 
+### Task farming — `lab1-proteins-mp-ep.py`, `lab1-proteins-th-ep.py`
+
+The other two programs parallelize the outer loop instead, the one that runs
+k-means once per candidate `k` to build the elbow curve. Those runs are
+completely independent of each other, which makes this the embarrassingly
+parallel decomposition of the problem:
+
+- **Decomposition.** One task per candidate `k`: a whole k-means run.
+- **Assignation.** The ten tasks are farmed out to ten workers.
+- **Orchestration.** None. No task reads what another task writes, so there is
+  nothing to synchronize while they run — the threaded version needs a lock
+  only to drop each finished model into the shared result table.
+- **Combination.** Once every task has finished, the master reads the
+  inertias off the collected models and picks the optimum `k`. The model for
+  that `k` was already fitted by its task, so the final clustering costs no
+  extra k-means run — only one pass to label the points.
+
+`lab1-proteins-mp-ep.py` creates a `mp.Pool` and calls `pool.map` once, over
+`range(1, 11)`; the pool `initializer` hands the dataset to every process at
+startup so that no task carries it. `lab1-proteins-th-ep.py` starts one
+`threading.Thread` per `k`, all sharing the one copy of the dataset, and joins
+them all before reading the results. Each task seeds its own generator with
+`SEED`, so which worker picks a task up, and in which order the tasks finish,
+cannot change the result.
+
+Task farming is the simpler of the two paradigms — one `map` call against a
+per-iteration dispatch — but it is the slower one here, for two reasons that
+the report covers. The tasks are very unequal: k-means with `k = 10` takes
+4.1 s on its own and k-means with `k = 1` takes 0.07 s, and a farm can never
+finish before its longest task, which caps the speedup of the clustering phase
+at about 10. And the ten tasks each stream the whole 16 MB dataset from main
+memory, whereas the data-parallel versions give every worker a chunk small
+enough to stay in cache, so the farm saturates the memory bandwidth first.
+
 ## Measured times
 
 Median of three interleaved runs on 2,000,000 proteins, `SEED = 42`, on an
 idle i5-13500H (12 cores — 4 performance cores with SMT and 8 efficiency cores
 — 16 logical):
 
-| Version         | Time    | Speedup |
-| --------------- | ------- | ------- |
-| serial          | 37.35 s | 1.00    |
-| multiprocessing |  7.37 s | 5.07    |
-| threads         |  9.84 s | 3.80    |
+| Version                          | Time    | Speedup |
+| -------------------------------- | ------- | ------- |
+| serial                           | 41.60 s | 1.00    |
+| multiprocessing, data parallel   |  8.30 s | 5.01    |
+| threads, data parallel           | 10.79 s | 3.86    |
+| multiprocessing, task farming    | 14.38 s | 2.89    |
+| threads, task farming            | 14.01 s | 2.97    |
 
 Measure on an idle machine: under sustained load the CPU settles into a lower
 clock, and the same program takes 35.0 s cold against 37.4 s in steady state.
 Speedups are unaffected; absolute times only compare within one measurement
 session.
 
-The full measurement set — scaling curves, phase breakdown, Amdahl and
-Karp-Flatt analysis, figures — is in [`findings.md`](findings.md), and as a
-web page in [`findings.html`](findings.html).
+The full measurement set for the two data-parallel programs — scaling curves,
+phase breakdown, Amdahl and Karp-Flatt analysis, figures — is in
+[`findings.md`](findings.md), and as a web page in
+[`findings.html`](findings.html). Its absolute times come from an earlier
+session and run about 10 % faster than the table above, which was measured in
+one go with the task-farming programs; the speedups are what compare.
 
 Reading the CSV takes about 1.8 s in every version and is not parallelized,
 which bounds the speedup from above; the rest of the gap comes from the
@@ -140,6 +187,12 @@ joined on every iteration, so extra chunks only add overhead instead of
 balancing the load. That, plus the parts of NumPy that keep the GIL, is why
 threads end up slower than processes.
 
+The task-farming programs have nothing to choose: the farm holds exactly one
+task per candidate `k`, so it runs ten workers whatever the machine offers.
+The pool is capped at ten processes for that reason — a sixteenth process
+would only pay for its own startup and for a copy of the dataset it would
+never cluster, which measured 1.6 s of the run.
+
 ## Layout
 
 ```
@@ -148,8 +201,10 @@ threads end up slower than processes.
 ├── findings.html             # the same report as a standalone web page
 ├── figures/                  # the report figures, 160 dpi
 ├── lab1-proteins-serial.py   # part one, serial
-├── lab1-proteins-mp.py       # part two, multiprocessing
-├── lab1-Proteins-th.py       # part three, threads
+├── lab1-proteins-mp.py       # part two, multiprocessing, data parallel
+├── lab1-proteins-mp-ep.py    # part two, multiprocessing, task farming
+├── lab1-proteins-th.py       # part three, threads, data parallel
+├── lab1-proteins-th-ep.py    # part three, threads, task farming
 ├── proteins-generator.py     # course material, untouched
 ├── proteins.csv              # generated, not committed
 ├── authors.txt               # one line per author (NIA, SURNAMES, NAME)
@@ -159,8 +214,8 @@ threads end up slower than processes.
 ```
 
 The delivery expects standalone `.py` files, so each part is a single script
-at the root of the repository rather than a package. The three programs
-therefore repeat the code they have in common — reading the dataset, choosing
+at the root of the repository rather than a package. The programs therefore
+repeat the code they have in common — reading the dataset, choosing
 the optimum `k`, reporting and plotting — instead of importing it from a
 shared module that could not be delivered.
 

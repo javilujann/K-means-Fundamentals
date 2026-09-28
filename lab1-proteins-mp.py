@@ -135,7 +135,6 @@ def longest_sequence_cluster(
 
 
 def main() -> None:
-    """Run part two of the lab and print its results."""
     start = time.perf_counter()
 
     rng = np.random.default_rng(SEED)
