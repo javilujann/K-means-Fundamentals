@@ -1,16 +1,3 @@
-"""Lab 1, part one: serial k-means over ``proteins.csv``.
-
-The program reads the dataset, builds the elbow graph to choose the optimum
-number of clusters, clusters the proteins by ``enzyme`` and ``hydrofob``,
-reports the cluster holding the longest sequence and prints the execution
-time. Every figure is built only after the clock has been stopped, so nothing
-blocks while the work being measured is running.
-
-Run it from the directory that holds ``proteins.csv``::
-
-    python lab1-proteins-serial.py
-"""
-
 from __future__ import annotations
 
 import time
@@ -34,14 +21,6 @@ Lengths = npt.NDArray[np.integer]
 
 
 def read_dataset() -> tuple[Points, Lengths]:
-    """Read the proteins file.
-
-    Only the columns the lab needs are parsed, and the sequences are turned
-    into their lengths right away so that the strings can be released.
-
-    Returns:
-        The ``(enzyme, hydrofob)`` points and the length of every sequence.
-    """
     frame = pd.read_csv(
         DATA_FILE,
         usecols=[*FEATURES, "sequence"],
@@ -53,20 +32,6 @@ def read_dataset() -> tuple[Points, Lengths]:
 
 
 def assign(points: Points, centroids: Points) -> tuple[Labels, float]:
-    """Assign every point to its closest centroid (Euclidean distance).
-
-    Distances are compared one centroid at a time, which keeps the memory in
-    use proportional to the number of points instead of points times
-    clusters.
-
-    Args:
-        points: One row per protein.
-        centroids: One row per cluster.
-
-    Returns:
-        The cluster index of every point and the inertia (the sum of the
-        squared distances to the assigned centroid).
-    """
     labels = np.zeros(len(points), np.int32)
     best = np.full(len(points), np.inf, np.float32)
     for cluster, centroid in enumerate(centroids):
@@ -80,16 +45,6 @@ def assign(points: Points, centroids: Points) -> tuple[Labels, float]:
 
 
 def update(points: Points, labels: Labels, centroids: Points) -> Points:
-    """Move every centroid to the mean of the points assigned to it.
-
-    Args:
-        points: One row per protein.
-        labels: Cluster index of every point.
-        centroids: Current centroids, kept in place for empty clusters.
-
-    Returns:
-        The new centroids.
-    """
     k = len(centroids)
     counts = np.bincount(labels, minlength=k)
     moved = np.empty_like(centroids)
@@ -104,16 +59,6 @@ def update(points: Points, labels: Labels, centroids: Points) -> Points:
 def kmeans(
     points: Points, k: int, rng: np.random.Generator
 ) -> tuple[Points, Labels, float]:
-    """Cluster ``points`` into ``k`` groups with Lloyd's algorithm.
-
-    Args:
-        points: One row per protein.
-        k: Number of clusters.
-        rng: Random generator used to pick the initial centroids.
-
-    Returns:
-        The centroids, the cluster index of every point and the inertia.
-    """
     centroids = points[rng.choice(len(points), k, replace=False)]
     labels, inertia = assign(points, centroids)
     for _ in range(MAX_ITERATIONS):
@@ -126,31 +71,10 @@ def kmeans(
 
 
 def elbow(points: Points, rng: np.random.Generator) -> npt.NDArray[np.float64]:
-    """Compute the inertia of every candidate ``k`` in :data:`K_VALUES`.
-
-    Args:
-        points: One row per protein.
-        rng: Random generator used to pick the initial centroids.
-
-    Returns:
-        The inertia of each candidate ``k``, in the order of :data:`K_VALUES`.
-    """
     return np.array([kmeans(points, k, rng)[2] for k in K_VALUES])
 
 
 def optimal_k(inertias: npt.NDArray[np.float64]) -> int:
-    """Pick the knee of the elbow curve.
-
-    Both axes are scaled to ``[0, 1]`` first, so the chosen ``k`` does not
-    depend on the units of the inertia; the answer is the point that lies
-    furthest from the straight line joining the two ends of the curve.
-
-    Args:
-        inertias: The inertia of each candidate ``k``.
-
-    Returns:
-        The optimum number of clusters.
-    """
     ks = np.array(K_VALUES, np.float64)
     x = (ks - ks[0]) / (ks[-1] - ks[0])
     y = (inertias - inertias[-1]) / (inertias[0] - inertias[-1])
@@ -162,86 +86,12 @@ def optimal_k(inertias: npt.NDArray[np.float64]) -> int:
 def longest_sequence_cluster(
     labels: Labels, lengths: Lengths, centroids: Points
 ) -> tuple[int, int, float]:
-    """Find the cluster holding the longest sequence.
-
-    Ties are broken by the ``hydrofob`` value of the centroid, as the lab
-    material asks.
-
-    Args:
-        labels: Cluster index of every point.
-        lengths: Length of every sequence.
-        centroids: One row per cluster.
-
-    Returns:
-        The cluster index, the longest sequence length in the dataset and the
-        average sequence length of that cluster.
-    """
     longest = int(lengths.max())
     candidates = np.unique(labels[lengths == longest])
     hydrofob = FEATURES.index("hydrofob")
     cluster = int(candidates[centroids[candidates, hydrofob].argmax()])
     average = float(lengths[labels == cluster].mean())
     return cluster, longest, average
-
-
-def plot_elbow(inertias: npt.NDArray[np.float64], k: int) -> None:
-    """Plot the elbow graph, marking the chosen ``k``."""
-    plt.figure("Elbow graph")
-    plt.plot(K_VALUES, inertias, marker="o")
-    plt.plot(k, inertias[k - K_VALUES.start], marker="o", color="red", markersize=12)
-    plt.title(f"Elbow graph (optimum k = {k})")
-    plt.xlabel("Number of clusters (k)")
-    plt.ylabel("Inertia")
-    plt.xticks(list(K_VALUES))
-    plt.grid(visible=True, alpha=0.3)
-
-
-def plot_clusters(
-    points: Points, labels: Labels, centroids: Points, rng: np.random.Generator
-) -> None:
-    """Scatter the clusters and their centroids.
-
-    A random sample of the points is drawn: the full dataset holds millions of
-    proteins over a handful of distinct values, so plotting all of them costs
-    a lot and shows exactly the same picture.
-    """
-    sample = rng.choice(len(points), min(SCATTER_SAMPLE, len(points)), replace=False)
-    plt.figure("Clusters")
-    plt.scatter(
-        points[sample, 0], points[sample, 1], c=labels[sample], cmap="tab10", s=5
-    )
-    plt.scatter(
-        centroids[:, 0],
-        centroids[:, 1],
-        c="black",
-        marker="X",
-        s=150,
-        label="centroids",
-    )
-    plt.title(f"Clusters by enzyme and hydrofob (k = {len(centroids)})")
-    plt.xlabel("enzyme")
-    plt.ylabel("hydrofob")
-    plt.legend()
-
-
-def plot_heatmap(centroids: Points) -> None:
-    """Plot a heat map of the centroid values.
-
-    Each feature is scaled to ``[0, 1]`` for the color only, because
-    ``hydrofob`` is an order of magnitude larger than ``enzyme`` and would
-    otherwise flatten the map; the cells are annotated with the real values.
-    """
-    lowest = centroids.min(axis=0)
-    span = np.maximum(centroids.max(axis=0) - lowest, 1e-12)
-    plt.figure("Centroids heat map")
-    plt.imshow((centroids - lowest) / span, cmap="viridis", aspect="auto")
-    plt.colorbar(label="scaled value")
-    plt.title("Heat map of the clusters' centroids")
-    plt.xticks(range(len(FEATURES)), FEATURES)
-    plt.yticks(range(len(centroids)), [f"cluster {i}" for i in range(len(centroids))])
-    for cluster, centroid in enumerate(centroids):
-        for feature, value in enumerate(centroid):
-            plt.text(feature, cluster, f"{value:.2f}", ha="center", va="center")
 
 
 def main() -> None:
@@ -269,9 +119,45 @@ def main() -> None:
     )
     print(f"Execution time: {elapsed:.3f} s")
 
-    plot_elbow(inertias, k)
-    plot_clusters(points, labels, centroids, rng)
-    plot_heatmap(centroids)
+    plt.figure("Elbow graph")
+    plt.plot(K_VALUES, inertias, marker="o")
+    plt.plot(k, inertias[k - K_VALUES.start], marker="o", color="red", markersize=12)
+    plt.title(f"Elbow graph (optimum k = {k})")
+    plt.xlabel("Number of clusters (k)")
+    plt.ylabel("Inertia")
+    plt.xticks(list(K_VALUES))
+    plt.grid(visible=True, alpha=0.3)
+
+    sample = rng.choice(len(points), min(SCATTER_SAMPLE, len(points)), replace=False)
+    plt.figure("Clusters")
+    plt.scatter(
+        points[sample, 0], points[sample, 1], c=labels[sample], cmap="tab10", s=5
+    )
+    plt.scatter(
+        centroids[:, 0],
+        centroids[:, 1],
+        c="black",
+        marker="X",
+        s=150,
+        label="centroids",
+    )
+    plt.title(f"Clusters by enzyme and hydrofob (k = {len(centroids)})")
+    plt.xlabel("enzyme")
+    plt.ylabel("hydrofob")
+    plt.legend()
+
+    lowest = centroids.min(axis=0)
+    span = np.maximum(centroids.max(axis=0) - lowest, 1e-12)
+    plt.figure("Centroids heat map")
+    plt.imshow((centroids - lowest) / span, cmap="viridis", aspect="auto")
+    plt.colorbar(label="scaled value")
+    plt.title("Heat map of the clusters' centroids")
+    plt.xticks(range(len(FEATURES)), FEATURES)
+    plt.yticks(range(len(centroids)), [f"cluster {i}" for i in range(len(centroids))])
+    for cluster, centroid in enumerate(centroids):
+        for feature, value in enumerate(centroid):
+            plt.text(feature, cluster, f"{value:.2f}", ha="center", va="center")
+
     plt.show()
 
 
