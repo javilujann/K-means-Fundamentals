@@ -118,14 +118,47 @@ def main() -> None:
     )
     print(f"Execution time: {elapsed:.3f} s")
 
+    optimum = float(inertias[k - K_VALUES.start])
+    first, last = K_VALUES.start, K_VALUES[-1]
+    lowest, highest = float(inertias[-1]), float(inertias[0])
+    x = (k - first) / (last - first)
+    y = (float(inertias[k - first]) - lowest) / (highest - lowest)
+    # Foot of the perpendicular from (x, y) to the line x + y = 1.
+    offset = (x + y - 1) / 2
+    foot_k, foot_inertia = first + (x - offset) * (last - first), lowest + (y - offset) * (highest - lowest)
     plt.figure("Elbow graph")
-    plt.plot(K_VALUES, inertias, marker="o")
-    plt.plot(k, inertias[k - K_VALUES.start], marker="o", color="red", markersize=12)
+    plt.plot(K_VALUES, inertias, marker="o", label="inertia")
+    plt.plot(
+        [K_VALUES.start, K_VALUES[-1]],
+        [inertias[0], inertias[-1]],
+        linestyle="--",
+        color="gray",
+        label="line joining the ends of the curve",
+    )
+    plt.plot(
+        [k, foot_k],
+        [optimum, foot_inertia],
+        linestyle=":",
+        color="red",
+        label="distance from the curve to that line",
+    )
+    plt.plot(
+        k,
+        optimum,
+        marker="o",
+        color="red",
+        markersize=12,
+        label=f"optimum k = {k}",
+    )
     plt.title(f"Elbow graph (optimum k = {k})")
     plt.xlabel("Number of clusters (k)")
     plt.ylabel("Inertia")
     plt.xticks(list(K_VALUES))
     plt.grid(visible=True, alpha=0.3)
+    plt.legend()
+    # The perpendicular is computed with both axes scaled to [0, 1], so it only
+    # shows as a right angle if the box it is drawn in is square.
+    plt.gca().set_box_aspect(1)
 
     sample = rng.choice(len(points), min(SCATTER_SAMPLE, len(points)), replace=False)
     plt.figure("Clusters")

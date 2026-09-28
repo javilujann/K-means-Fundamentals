@@ -66,7 +66,9 @@ that holds the file.
    `hydrofob` of the centroid — and averages the sequence lengths in it.
 7. Stops the clock, prints the results and the execution time.
 8. Only then builds the three figures and shows them: elbow graph, clusters
-   with their centroids, and a heat map of the centroid values.
+   with their centroids, and a heat map of the centroid values. The elbow
+   graph draws the criterion of step 4 as well as the curve — the line joining
+   the two ends, and the perpendicular dropped from the chosen point onto it.
 
 Nothing blocks while the measured work is running, as the lab requires: no
 figure is created before the clock has been stopped.
