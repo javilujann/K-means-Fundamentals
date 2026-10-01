@@ -40,6 +40,15 @@ def read_dataset() -> tuple[Points, Lengths]:
     return points, lengths
 
 
+def standardize(points: Points) -> tuple[Points, Points, Points]:
+    # The features live on very different scales (enzyme 1-10, hydrofob
+    # 40-220), so without this hydrofob would carry nearly all of the
+    # Euclidean distance and enzyme would hardly affect the clusters.
+    center = points.mean(axis=0, dtype=np.float64).astype(np.float32)
+    spread = np.maximum(points.std(axis=0, dtype=np.float64), 1e-12).astype(np.float32)
+    return (points - center) / spread, center, spread
+
+
 def assign(points: Points, centroids: Points) -> tuple[Labels, float]:
     labels = np.zeros(len(points), np.int32)
     best = np.full(len(points), np.inf, np.float32)
@@ -139,14 +148,16 @@ def main() -> None:
 
     rng = np.random.default_rng(SEED)
     points, lengths = read_dataset()
-    chunks = split(len(points), PROCESSES * CHUNKS_PER_PROCESS)
+    scaled, center, spread = standardize(points)
+    chunks = split(len(scaled), PROCESSES * CHUNKS_PER_PROCESS)
     # The pool is created once and holds the dataset for the whole run: making
     # one per k-means call would copy the data to the workers again and again.
-    with mp.Pool(PROCESSES, initializer=init_worker, initargs=(points,)) as pool:
-        inertias = elbow(pool, chunks, points, rng)
+    with mp.Pool(PROCESSES, initializer=init_worker, initargs=(scaled,)) as pool:
+        inertias = elbow(pool, chunks, scaled, rng)
         k = optimal_k(inertias)
-        centroids, _ = kmeans(pool, chunks, points, k, rng)
-    labels, _ = assign(points, centroids)
+        centroids, _ = kmeans(pool, chunks, scaled, k, rng)
+    labels, _ = assign(scaled, centroids)
+    centroids = centroids * spread + center
     cluster, longest, average = longest_sequence_cluster(labels, lengths, centroids)
 
     elapsed = time.perf_counter() - start

@@ -31,6 +31,12 @@ def read_dataset() -> tuple[Points, Lengths]:
     return points, lengths
 
 
+def standardize(points: Points) -> tuple[Points, Points, Points]:
+    center = points.mean(axis=0, dtype=np.float64).astype(np.float32)
+    spread = np.maximum(points.std(axis=0, dtype=np.float64), 1e-12).astype(np.float32)
+    return (points - center) / spread, center, spread
+
+
 def assign(points: Points, centroids: Points) -> tuple[Labels, float]:
     labels = np.zeros(len(points), np.int32)
     best = np.full(len(points), np.inf, np.float32)
@@ -99,9 +105,11 @@ def main() -> None:
 
     rng = np.random.default_rng(SEED)
     points, lengths = read_dataset()
-    inertias = elbow(points, rng)
+    scaled, center, spread = standardize(points)
+    inertias = elbow(scaled, rng)
     k = optimal_k(inertias)
-    centroids, labels, _ = kmeans(points, k, rng)
+    centroids, labels, _ = kmeans(scaled, k, rng)
+    centroids = centroids * spread + center
     cluster, longest, average = longest_sequence_cluster(labels, lengths, centroids)
 
     elapsed = time.perf_counter() - start

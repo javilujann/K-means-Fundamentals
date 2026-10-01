@@ -36,6 +36,15 @@ def read_dataset() -> tuple[Points, Lengths]:
     return points, lengths
 
 
+def standardize(points: Points) -> tuple[Points, Points, Points]:
+    # The features live on very different scales (enzyme 1-10, hydrofob
+    # 40-220), so without this hydrofob would carry nearly all of the
+    # Euclidean distance and enzyme would hardly affect the clusters.
+    center = points.mean(axis=0, dtype=np.float64).astype(np.float32)
+    spread = np.maximum(points.std(axis=0, dtype=np.float64), 1e-12).astype(np.float32)
+    return (points - center) / spread, center, spread
+
+
 def assign(points: Points, centroids: Points) -> tuple[Labels, float]:
     labels = np.zeros(len(points), np.int32)
     best = np.full(len(points), np.inf, np.float32)
@@ -106,14 +115,16 @@ def main() -> None:
     start = time.perf_counter()
 
     points, lengths = read_dataset()
+    scaled, center, spread = standardize(points)
 
-    with mp.Pool(PROCESSES, initializer=init_worker, initargs=(points,)) as pool:
+    with mp.Pool(PROCESSES, initializer=init_worker, initargs=(scaled,)) as pool:
         models = pool.map(kmeans_task, K_VALUES)
 
     inertias = np.array([inertia for _, inertia in models])
     k = optimal_k(inertias)
     centroids = models[k - K_VALUES.start][0]
-    labels, _ = assign(points, centroids)
+    labels, _ = assign(scaled, centroids)
+    centroids = centroids * spread + center
     cluster, longest, average = longest_sequence_cluster(labels, lengths, centroids)
 
     elapsed = time.perf_counter() - start
