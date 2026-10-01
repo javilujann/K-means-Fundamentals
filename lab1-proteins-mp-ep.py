@@ -37,9 +37,6 @@ def read_dataset() -> tuple[Points, Lengths]:
 
 
 def standardize(points: Points) -> tuple[Points, Points, Points]:
-    # The features live on very different scales (enzyme 1-10, hydrofob
-    # 40-220), so without this hydrofob would carry nearly all of the
-    # Euclidean distance and enzyme would hardly affect the clusters.
     center = points.mean(axis=0, dtype=np.float64).astype(np.float32)
     spread = np.maximum(points.std(axis=0, dtype=np.float64), 1e-12).astype(np.float32)
     return (points - center) / spread, center, spread
