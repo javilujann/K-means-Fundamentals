@@ -35,7 +35,7 @@ python proteins-generator.py 2000000 42    # performance measurements
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # fish: source .venv/bin/activate.fish
-python -m pip install --group dev
+python -m pip install --group run
 python lab1-proteins-serial.py    # part one
 python lab1-proteins-mp.py        # part two,   data parallel
 python lab1-proteins-mp-ep.py     # part two,   task farming
